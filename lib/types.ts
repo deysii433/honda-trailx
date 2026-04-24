@@ -1,17 +1,29 @@
 export type CategoriaVehiculo = 'cuatrimoto' | 'moto' | 'pioneer'
 
+export interface FichaTecnica {
+  suspension: string
+  transmision: string
+  velocidad: string
+  peso: string
+  tanque: string
+  arranque: string
+  enfriamiento: string
+}
+
 export interface Vehiculo {
   id: string
   nombre: string
   categoria: CategoriaVehiculo
   precio: number
   imagen: string
+  imagenes?: string[]
   color: string
   traccion: string
   motor: string // Solo el número ej: "420", "450", "520", "700"
   año: string
   combustible: string // Ej: "Gasolina", "Sin plomo"
   descripcion: string
+  fichaTecnica?: FichaTecnica
   disponible: boolean
 }
 

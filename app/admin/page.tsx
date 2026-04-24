@@ -27,27 +27,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Cuatrimoto, CategoriaVehiculo, CATEGORIAS } from '@/lib/types'
-import { useProductosStore } from '@/lib/store'
+import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
 import { 
-  Lock, 
+  AlertCircle,
   LogOut, 
   Plus, 
   Edit2, 
   Trash2, 
   Package, 
   Eye,
-  ArrowLeft,
   Save,
   X,
   ImageIcon,
   Upload,
   Bike,
   Truck,
-  CheckCircle2
+  CheckCircle2,
 } from 'lucide-react'
-
-const ADMIN_PASSWORD = 'MiClaveSegura2026'
 
 const CATEGORIA_ICONS: Record<CategoriaVehiculo, React.ElementType> = {
   cuatrimoto: Bike,
@@ -56,9 +54,6 @@ const CATEGORIA_ICONS: Record<CategoriaVehiculo, React.ElementType> = {
 }
 
 export default function AdminPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [password, setPassword] = useState('')
-  const [passwordError, setPasswordError] = useState('')
   const [activeTab, setActiveTab] = useState<'lista' | 'agregar'>('lista')
   const [editingProduct, setEditingProduct] = useState<Cuatrimoto | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -67,18 +62,33 @@ export default function AdminPage() {
   const [filterCategoria, setFilterCategoria] = useState<CategoriaVehiculo | 'todas'>('todas')
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [productos, setProductos] = useState<Cuatrimoto[]>([])
+  const [listError, setListError] = useState('')
+  const [formError, setFormError] = useState('')
 
-  // Zustand store
-  const productos = useProductosStore((state) => state.productos)
-  const agregarProducto = useProductosStore((state) => state.agregarProducto)
-  const actualizarProducto = useProductosStore((state) => state.actualizarProducto)
-  const eliminarProducto = useProductosStore((state) => state.eliminarProducto)
+  const fetchProductos = async () => {
+    setListError('')
+    try {
+      const response = await fetch('/api/productos', { cache: 'no-store' })
+      const raw = (await response.json().catch(() => ({}))) as { error?: string } | Cuatrimoto[]
+      if (!response.ok) {
+        setListError(typeof (raw as { error?: string }).error === 'string' ? (raw as { error: string }).error : 'No se pudieron cargar los productos')
+        setProductos([])
+        return
+      }
+      setProductos(Array.isArray(raw) ? raw : [])
+    } catch {
+      setListError('Error de red al cargar los productos')
+      setProductos([])
+    }
+  }
 
   const [formData, setFormData] = useState({
     nombre: '',
     categoria: 'cuatrimoto' as CategoriaVehiculo,
     precio: '',
     imagen: '/images/atv-1.jpg',
+    imagenes: ['/images/atv-1.jpg'] as string[],
     color: '',
     traccion: '4x2',
     motor: '',
@@ -89,27 +99,17 @@ export default function AdminPage() {
   })
 
   useEffect(() => {
-    const auth = sessionStorage.getItem('admin_auth')
-    if (auth === 'true') {
-      setIsAuthenticated(true)
-    }
+    void fetchProductos()
   }, [])
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (password === ADMIN_PASSWORD) {
-      setIsAuthenticated(true)
-      sessionStorage.setItem('admin_auth', 'true')
-      setPasswordError('')
-    } else {
-      setPasswordError('Contraseña incorrecta')
+  const handleLogout = async () => {
+    try {
+      const supabase = createSupabaseBrowserClient()
+      await supabase.auth.signOut()
+    } catch {
+      /* env faltante u otro error */
     }
-  }
-
-  const handleLogout = () => {
-    setIsAuthenticated(false)
-    sessionStorage.removeItem('admin_auth')
-    setPassword('')
+    window.location.href = '/admin/login'
   }
 
   const resetForm = () => {
@@ -118,6 +118,7 @@ export default function AdminPage() {
       categoria: 'cuatrimoto',
       precio: '',
       imagen: '/images/atv-1.jpg',
+      imagenes: ['/images/atv-1.jpg'],
       color: '',
       traccion: '4x2',
       motor: '',
@@ -129,25 +130,44 @@ export default function AdminPage() {
   }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
+    const files = Array.from(e.target.files ?? [])
+    if (!files.length) return
+
+    files.forEach((file) => {
       const reader = new FileReader()
       reader.onloadend = () => {
         const base64 = reader.result as string
-        setCustomImages(prev => [...prev, base64])
-        setFormData({ ...formData, imagen: base64 })
+        setCustomImages((prev) => [...prev, base64])
+        setFormData((prev) => {
+          const nextImages = prev.imagenes.includes(base64) ? prev.imagenes : [...prev.imagenes, base64]
+          return { ...prev, imagenes: nextImages, imagen: nextImages[0] ?? base64 }
+        })
       }
       reader.readAsDataURL(file)
-    }
+    })
+
+    // permite volver a seleccionar el mismo archivo
+    e.target.value = ''
   }
 
-  const handleAddProduct = (e: React.FormEvent) => {
+  const toggleSelectedImage = (img: string) => {
+    setFormData((prev) => {
+      const exists = prev.imagenes.includes(img)
+      const nextImages = exists ? prev.imagenes.filter((x) => x !== img) : [...prev.imagenes, img]
+      const safeImages = nextImages.length > 0 ? nextImages : [prev.imagen]
+      return { ...prev, imagenes: safeImages, imagen: safeImages[0] }
+    })
+  }
+
+  const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault()
-    agregarProducto({
+    setFormError('')
+    const payload = {
       nombre: formData.nombre,
       categoria: formData.categoria,
       precio: parseInt(formData.precio),
       imagen: formData.imagen,
+      imagenes: formData.imagenes,
       color: formData.color,
       traccion: formData.traccion,
       motor: formData.motor,
@@ -155,7 +175,20 @@ export default function AdminPage() {
       combustible: formData.combustible,
       descripcion: formData.descripcion,
       disponible: formData.disponible,
+    }
+
+    const response = await fetch('/api/productos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     })
+    const raw = (await response.json().catch(() => ({}))) as { error?: string }
+    if (!response.ok) {
+      setFormError(typeof raw.error === 'string' ? raw.error : 'No se pudo guardar el vehículo')
+      return
+    }
+
+    await fetchProductos()
     resetForm()
     setActiveTab('lista')
     setShowSuccessMessage(true)
@@ -163,12 +196,14 @@ export default function AdminPage() {
   }
 
   const handleEditProduct = (producto: Cuatrimoto) => {
+    setFormError('')
     setEditingProduct(producto)
     setFormData({
       nombre: producto.nombre,
       categoria: producto.categoria,
       precio: producto.precio.toString(),
       imagen: producto.imagen,
+      imagenes: producto.imagenes && producto.imagenes.length > 0 ? producto.imagenes : [producto.imagen],
       color: producto.color,
       traccion: producto.traccion,
       motor: producto.motor,
@@ -180,15 +215,17 @@ export default function AdminPage() {
     setIsEditModalOpen(true)
   }
 
-  const handleUpdateProduct = (e: React.FormEvent) => {
+  const handleUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingProduct) return
+    setFormError('')
 
-    actualizarProducto(editingProduct.id, {
+    const payload = {
       nombre: formData.nombre,
       categoria: formData.categoria,
       precio: parseInt(formData.precio),
       imagen: formData.imagen,
+      imagenes: formData.imagenes,
       color: formData.color,
       traccion: formData.traccion,
       motor: formData.motor,
@@ -196,7 +233,20 @@ export default function AdminPage() {
       combustible: formData.combustible,
       descripcion: formData.descripcion,
       disponible: formData.disponible,
+    }
+
+    const response = await fetch(`/api/productos/${editingProduct.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     })
+    const raw = (await response.json().catch(() => ({}))) as { error?: string }
+    if (!response.ok) {
+      setFormError(typeof raw.error === 'string' ? raw.error : 'No se pudo actualizar')
+      return
+    }
+
+    await fetchProductos()
 
     setIsEditModalOpen(false)
     setEditingProduct(null)
@@ -205,8 +255,15 @@ export default function AdminPage() {
     setTimeout(() => setShowSuccessMessage(false), 3000)
   }
 
-  const handleDeleteProduct = (id: string) => {
-    eliminarProducto(id)
+  const handleDeleteProduct = async (id: string) => {
+    setFormError('')
+    const response = await fetch(`/api/productos/${id}`, { method: 'DELETE' })
+    const raw = (await response.json().catch(() => ({}))) as { error?: string }
+    if (!response.ok) {
+      setFormError(typeof raw.error === 'string' ? raw.error : 'No se pudo eliminar')
+      return
+    }
+    await fetchProductos()
     setDeleteProductId(null)
   }
 
@@ -243,54 +300,6 @@ export default function AdminPage() {
     return CATEGORIAS.find(c => c.value === cat)?.label || cat
   }
 
-  // Login Screen
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md p-8 bg-card border-border">
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 mx-auto bg-primary/20 rounded-full flex items-center justify-center mb-4">
-              <Lock className="w-8 h-8 text-primary" />
-            </div>
-            <h1 className="text-2xl font-bold text-card-foreground">Panel de Administrador</h1>
-            <p className="text-muted-foreground mt-2">Ingresa tu contraseña para acceder</p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Ingresa tu contraseña"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value)
-                  setPasswordError('')
-                }}
-                className="bg-input"
-              />
-              {passwordError && (
-                <p className="text-sm text-destructive">{passwordError}</p>
-              )}
-            </div>
-            <Button type="submit" className="w-full">
-              Ingresar
-            </Button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <Link href="/" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-              <ArrowLeft className="w-4 h-4 inline mr-1" />
-              Volver al sitio
-            </Link>
-          </div>
-        </Card>
-      </div>
-    )
-  }
-
-  // Admin Panel
   return (
     <div className="min-h-screen bg-background">
       {/* Success Message */}
@@ -333,6 +342,12 @@ export default function AdminPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {listError && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{listError}</AlertDescription>
+          </Alert>
+        )}
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           <Card className="p-4 bg-card border-border">
@@ -369,7 +384,10 @@ export default function AdminPage() {
         <div className="flex flex-wrap gap-2 mb-6">
           <Button
             variant={activeTab === 'lista' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('lista')}
+            onClick={() => {
+              setFormError('')
+              setActiveTab('lista')
+            }}
           >
             <Package className="w-4 h-4 mr-2" />
             Productos
@@ -378,6 +396,7 @@ export default function AdminPage() {
             variant={activeTab === 'agregar' ? 'default' : 'outline'}
             onClick={() => {
               resetForm()
+              setFormError('')
               setActiveTab('agregar')
             }}
           >
@@ -485,6 +504,12 @@ export default function AdminPage() {
         {activeTab === 'agregar' && (
           <Card className="max-w-2xl p-6 bg-card border-border">
             <h2 className="text-xl font-bold text-card-foreground mb-6">Agregar nuevo vehículo Honda</h2>
+            {formError && (
+              <Alert variant="destructive" className="mb-6">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{formError}</AlertDescription>
+              </Alert>
+            )}
             <form onSubmit={handleAddProduct} className="space-y-6">
               {/* Categoría */}
               <div className="space-y-2">
@@ -612,6 +637,7 @@ export default function AdminPage() {
                     ref={fileInputRef}
                     onChange={handleImageUpload}
                     accept="image/*"
+                    multiple
                     className="hidden"
                   />
                   <Button
@@ -632,13 +658,15 @@ export default function AdminPage() {
                     <button
                       key={`${img}-${index}`}
                       type="button"
-                      onClick={() => setFormData({ ...formData, imagen: img })}
+                      onClick={() => toggleSelectedImage(img)}
                       className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                        formData.imagen === img ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-muted-foreground'
+                        formData.imagenes.includes(img)
+                          ? 'border-primary ring-2 ring-primary/30'
+                          : 'border-border hover:border-muted-foreground'
                       }`}
                     >
                       <Image src={img} alt="Opción" fill className="object-cover" />
-                      {formData.imagen === img && (
+                      {formData.imagenes.includes(img) && (
                         <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
                           <ImageIcon className="w-6 h-6 text-primary" />
                         </div>
@@ -698,7 +726,13 @@ export default function AdminPage() {
       </main>
 
       {/* Edit Modal */}
-      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+      <Dialog
+        open={isEditModalOpen}
+        onOpenChange={(open) => {
+          setIsEditModalOpen(open)
+          if (!open) setFormError('')
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-card border-border">
           <DialogHeader>
             <DialogTitle>Editar vehículo</DialogTitle>
@@ -706,6 +740,13 @@ export default function AdminPage() {
               Modifica los datos del vehículo Honda
             </DialogDescription>
           </DialogHeader>
+
+          {formError && (
+            <Alert variant="destructive" className="mb-2">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{formError}</AlertDescription>
+            </Alert>
+          )}
           
           <form onSubmit={handleUpdateProduct} className="space-y-6">
             {/* Categoría */}
@@ -827,13 +868,15 @@ export default function AdminPage() {
                   <button
                     key={`edit-${img}-${index}`}
                     type="button"
-                    onClick={() => setFormData({ ...formData, imagen: img })}
+                    onClick={() => toggleSelectedImage(img)}
                     className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                      formData.imagen === img ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-muted-foreground'
+                      formData.imagenes.includes(img)
+                        ? 'border-primary ring-2 ring-primary/30'
+                        : 'border-border hover:border-muted-foreground'
                     }`}
                   >
                     <Image src={img} alt="Opción" fill className="object-cover" />
-                    {formData.imagen === img && (
+                    {formData.imagenes.includes(img) && (
                       <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
                         <ImageIcon className="w-4 h-4 text-primary" />
                       </div>

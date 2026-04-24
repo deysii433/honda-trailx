@@ -27,6 +27,8 @@ interface PurchaseModalProps {
 export function PurchaseModal({ cuatrimoto, isOpen, onClose }: PurchaseModalProps) {
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState({
+    tipoCompra: 'comprar',
+    metodoPago: '',
     nombre: '',
     telefono: '',
     metodoContacto: 'whatsapp',
@@ -51,23 +53,31 @@ export function PurchaseModal({ cuatrimoto, isOpen, onClose }: PurchaseModalProp
     { value: '30', label: '30%', monto: cuatrimoto.precio * 0.30 },
     { value: '50', label: '50%', monto: cuatrimoto.precio * 0.50 },
   ]
+  const metodosPago = [
+    { value: 'efectivo', label: 'Efectivo' },
+    { value: 'transferencia', label: 'Transferencia' },
+    { value: 'deposito', label: 'Deposito bancario' },
+  ]
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     const engancheInfo = engancheOpciones.find(e => e.value === formData.enganche)
     const montoEnganche = engancheInfo ? formatPrice(engancheInfo.monto) : 'Por definir'
     const restante = engancheInfo ? formatPrice(cuatrimoto.precio - engancheInfo.monto) : formatPrice(cuatrimoto.precio)
-    
-    const mensaje = `¡Hola! Quiero APARTAR la cuatrimoto Honda:
+    const metodoPagoSeleccionado = metodosPago.find((m) => m.value === formData.metodoPago)?.label || 'Por definir'
+    const esApartado = formData.tipoCompra === 'apartar'
+
+    const mensaje = `¡Hola! Quiero ${esApartado ? 'APARTAR' : 'COMPRAR AL MOMENTO'} este vehiculo Honda:
 
 *${cuatrimoto.nombre}*
 Precio total: ${formatPrice(cuatrimoto.precio)}
 Motor: ${cuatrimoto.motor}cc | Año: ${cuatrimoto.año}
 
-*Sistema de Apartado:*
+${esApartado ? `*Sistema de Apartado:*
 Enganche: ${formData.enganche}% (${montoEnganche})
-Restante a liquidar: ${restante}
+Restante a liquidar: ${restante}` : `*Compra al momento:*
+Metodo de pago elegido: ${metodoPagoSeleccionado}`}
 
 *Mis datos:*
 Nombre: ${formData.nombre}
@@ -76,7 +86,30 @@ Contacto preferido: ${formData.metodoContacto === 'whatsapp' ? 'WhatsApp' : 'Lla
 
 ${formData.mensaje ? `Comentarios: ${formData.mensaje}` : ''}
 
-¿Me pueden dar más información sobre el proceso de apartado y pago con tarjeta?`
+¿Me pueden ayudar a finalizar el proceso?`
+
+    const montoApartado = esApartado
+      ? engancheInfo?.monto ?? 0
+      : cuatrimoto.precio
+
+    await fetch('/api/apartados', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clienteId: null,
+        productoId: cuatrimoto.id,
+        nombreProducto: cuatrimoto.nombre,
+        nombreCliente: formData.nombre,
+        telefono: formData.telefono,
+        fecha: new Date().toISOString(),
+        montoApartado,
+        estadoPedido: 'pendiente',
+        tipoCompra: formData.tipoCompra,
+        metodoPago: formData.metodoPago || null,
+        metodoContacto: formData.metodoContacto,
+        mensaje: formData.mensaje || null,
+      }),
+    })
 
     const whatsappUrl = `https://wa.me/52${informacionNegocio.whatsapp}?text=${encodeURIComponent(mensaje)}`
     window.open(whatsappUrl, '_blank')
@@ -87,6 +120,8 @@ ${formData.mensaje ? `Comentarios: ${formData.mensaje}` : ''}
   const handleClose = () => {
     setStep(1)
     setFormData({
+      tipoCompra: 'comprar',
+      metodoPago: '',
       nombre: '',
       telefono: '',
       metodoContacto: 'whatsapp',
@@ -114,11 +149,11 @@ ${formData.mensaje ? `Comentarios: ${formData.mensaje}` : ''}
               <CheckCircle2 className="w-10 h-10 text-green-500" />
             </div>
             <h3 className="text-2xl font-bold text-card-foreground mb-3">
-              ¡Solicitud de apartado enviada!
+              {formData.tipoCompra === 'apartar' ? '¡Solicitud de apartado enviada!' : '¡Solicitud de compra enviada!'}
             </h3>
             <p className="text-muted-foreground mb-6">
-              Hemos recibido tu solicitud para apartar la {cuatrimoto.nombre}. 
-              Uno de nuestros asesores se pondrá en contacto contigo para finalizar el proceso.
+              Hemos recibido tu solicitud para {formData.tipoCompra === 'apartar' ? 'apartar' : 'comprar'} la {cuatrimoto.nombre}.
+              Uno de nuestros asesores se pondrá en contacto contigo para finalizar el proceso por WhatsApp.
             </p>
             <Button onClick={handleClose} className="w-full">
               Cerrar
@@ -146,11 +181,10 @@ ${formData.mensaje ? `Comentarios: ${formData.mensaje}` : ''}
             <div className="p-6">
               <DialogHeader className="text-left mb-6">
                 <DialogTitle className="text-xl font-bold">
-                  Sistema de Apartado
+                  Compra Honda
                 </DialogTitle>
                 <DialogDescription>
-                  Aparta tu cuatrimoto con un enganche y liquida en cómodos pagos. 
-                  Aceptamos pago con tarjeta de crédito/débito.
+                  Compra al momento o aparta con enganche. Finaliza por WhatsApp con un asesor.
                 </DialogDescription>
               </DialogHeader>
 
@@ -171,8 +205,52 @@ ${formData.mensaje ? `Comentarios: ${formData.mensaje}` : ''}
               <form onSubmit={handleSubmit} className="space-y-6">
                 {step === 1 && (
                   <>
-                    {/* Selección de enganche */}
+                    {/* Formas de pago primero */}
                     <div className="space-y-3">
+                      <Label className="text-base font-semibold">Formas de pago disponibles</Label>
+                      <RadioGroup
+                        value={formData.metodoPago}
+                        onValueChange={(value) =>
+                          setFormData({ ...formData, metodoPago: value, tipoCompra: 'comprar', enganche: '' })
+                        }
+                        className={`grid grid-cols-1 gap-3 ${formData.tipoCompra === 'apartar' ? 'opacity-60 pointer-events-none' : ''}`}
+                      >
+                        {metodosPago.map((metodo) => (
+                          <Label
+                            key={metodo.value}
+                            htmlFor={`pago-${metodo.value}`}
+                            className={`flex items-center justify-between gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                              formData.metodoPago === metodo.value && formData.tipoCompra === 'comprar'
+                                ? 'border-primary bg-primary/10'
+                                : 'border-border hover:border-muted-foreground'
+                            }`}
+                          >
+                            <RadioGroupItem value={metodo.value} id={`pago-${metodo.value}`} className="sr-only" />
+                            <span className="font-medium">{metodo.label}</span>
+                            <CreditCard className="w-5 h-5 text-muted-foreground" />
+                          </Label>
+                        ))}
+                      </RadioGroup>
+
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, tipoCompra: 'apartar', metodoPago: '' })}
+                        className="w-full text-left p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-card-foreground">¿Prefieres Apartar?</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Reserva con enganche y liquida después. (También es parte del proceso de compra)
+                            </p>
+                          </div>
+                          <Wallet className="w-5 h-5 text-primary" />
+                        </div>
+                      </button>
+                    </div>
+
+                    {/* Selección de enganche */}
+                    <div className={`space-y-3 ${formData.tipoCompra !== 'apartar' ? 'opacity-60 pointer-events-none' : ''}`}>
                       <Label className="text-base font-semibold">
                         ¿Cuánto deseas dar de enganche?
                       </Label>
@@ -241,7 +319,7 @@ ${formData.mensaje ? `Comentarios: ${formData.mensaje}` : ''}
                       type="button"
                       onClick={() => setStep(2)}
                       className="w-full"
-                      disabled={!formData.enganche}
+                      disabled={formData.tipoCompra === 'apartar' ? !formData.enganche : !formData.metodoPago}
                     >
                       Continuar
                     </Button>
@@ -250,8 +328,8 @@ ${formData.mensaje ? `Comentarios: ${formData.mensaje}` : ''}
 
                 {step === 2 && (
                   <>
-                    {/* Resumen del apartado */}
-                    {formData.enganche && (
+                    {/* Resumen */}
+                    {formData.tipoCompra === 'apartar' && formData.enganche && (
                       <div className="p-4 bg-secondary rounded-lg space-y-2">
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">Enganche ({formData.enganche}%):</span>
@@ -265,6 +343,15 @@ ${formData.mensaje ? `Comentarios: ${formData.mensaje}` : ''}
                             {formatPrice(cuatrimoto.precio - (engancheOpciones.find(e => e.value === formData.enganche)?.monto || 0))}
                           </span>
                         </div>
+                      </div>
+                    )}
+
+                    {formData.tipoCompra === 'comprar' && (
+                      <div className="p-4 bg-secondary rounded-lg space-y-1">
+                        <p className="text-sm text-muted-foreground">Método de pago elegido</p>
+                        <p className="font-semibold text-card-foreground">
+                          {metodosPago.find((m) => m.value === formData.metodoPago)?.label || 'Por definir'}
+                        </p>
                       </div>
                     )}
 
@@ -297,7 +384,7 @@ ${formData.mensaje ? `Comentarios: ${formData.mensaje}` : ''}
                         <Label htmlFor="mensaje">Comentarios adicionales (opcional)</Label>
                         <Textarea
                           id="mensaje"
-                          placeholder="¿Tienes alguna pregunta sobre el apartado?"
+                          placeholder="¿Tienes alguna pregunta sobre la compra o el apartado?"
                           value={formData.mensaje}
                           onChange={(e) => setFormData({ ...formData, mensaje: e.target.value })}
                           rows={3}
@@ -318,9 +405,9 @@ ${formData.mensaje ? `Comentarios: ${formData.mensaje}` : ''}
                       <Button
                         type="submit"
                         className="flex-1"
-                        disabled={!formData.nombre || !formData.telefono}
+                        disabled={!formData.nombre || !formData.telefono || (formData.tipoCompra === 'comprar' && !formData.metodoPago) || (formData.tipoCompra === 'apartar' && !formData.enganche)}
                       >
-                        Enviar solicitud
+                        Enviar a WhatsApp
                       </Button>
                     </div>
                   </>

@@ -133,6 +133,25 @@
   box-shadow: 0 0 20px oklch(0.55 0.24 25 / 0.3);
 }
 
+/* Soft elevated shadows for premium cards */
+.soft-shadow {
+  box-shadow:
+    0 6px 20px oklch(0.08 0.01 250 / 0.2),
+    0 1px 1px oklch(0.08 0.01 250 / 0.12);
+}
+
+/* Smooth upscale hover without aggressive movement */
+.hover-scale {
+  transition: transform 0.28s ease, box-shadow 0.28s ease;
+}
+
+.hover-scale:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow:
+    0 14px 32px oklch(0.08 0.01 250 / 0.26),
+    0 2px 2px oklch(0.08 0.01 250 / 0.14);
+}
+
 /* Racing stripe accent */
 .racing-stripe {
   position: relative;

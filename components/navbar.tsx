@@ -43,11 +43,6 @@ export function Navbar() {
                 {enlace.label}
               </Link>
             ))}
-            <Link href="/admin">
-              <Button variant="outline" size="sm">
-                Admin
-              </Button>
-            </Link>
           </div>
 
           {/* Social & Contact */}
@@ -108,11 +103,6 @@ export function Navbar() {
                 {enlace.label}
               </Link>
             ))}
-            <Link href="/admin" onClick={() => setIsOpen(false)}>
-              <Button variant="outline" size="sm" className="w-full mt-2">
-                Admin
-              </Button>
-            </Link>
             <div className="flex items-center gap-3 pt-4 border-t border-border">
               <a
                 href={informacionNegocio.facebook}

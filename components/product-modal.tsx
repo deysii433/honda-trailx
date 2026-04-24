@@ -1,9 +1,11 @@
 'use client'
 
 import Image from 'next/image'
+import { useState } from 'react'
 import { Cuatrimoto } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel'
 import {
   Dialog,
   DialogContent,
@@ -20,6 +22,8 @@ interface ProductModalProps {
 }
 
 export function ProductModal({ cuatrimoto, isOpen, onClose, onComprar }: ProductModalProps) {
+  const [activeSlide, setActiveSlide] = useState(0)
+
   if (!cuatrimoto) return null
 
   const formatPrice = (precio: number) => {
@@ -55,10 +59,22 @@ export function ProductModal({ cuatrimoto, isOpen, onClose, onComprar }: Product
     'Sistema de apartado disponible',
     'Pago con tarjeta de crédito/débito',
   ]
+  const ficha = cuatrimoto.fichaTecnica ?? {
+    suspension: 'Doble horquilla independiente',
+    transmision: 'Automatica / Manual segun version',
+    velocidad: 'Hasta 110 km/h',
+    peso: 'Aprox. 320 kg',
+    tanque: '14 L',
+    arranque: 'Electrico',
+    enfriamiento: 'Liquido',
+  }
+  const gallery = cuatrimoto.imagenes && cuatrimoto.imagenes.length > 0
+    ? cuatrimoto.imagenes
+    : [cuatrimoto.imagen]
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl p-0 bg-card border-border overflow-hidden">
+      <DialogContent className="max-w-4xl p-0 bg-card border-border max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
           className="absolute right-4 top-4 z-10 p-2 rounded-full bg-background/80 hover:bg-background transition-colors"
@@ -70,16 +86,52 @@ export function ProductModal({ cuatrimoto, isOpen, onClose, onComprar }: Product
         <div className="grid md:grid-cols-2 gap-0">
           {/* Image */}
           <div className="relative aspect-square md:aspect-auto bg-muted">
-            <Image
-              src={cuatrimoto.imagen}
-              alt={cuatrimoto.nombre}
-              fill
-              className="object-cover"
-              unoptimized={cuatrimoto.imagen.startsWith('data:')}
-            />
+            <Carousel
+              className="h-full"
+              setApi={(api) => {
+                if (!api) return
+                const update = () => setActiveSlide(api.selectedScrollSnap())
+                update()
+                api.on('select', update)
+              }}
+            >
+              <CarouselContent className="-ml-0 h-full">
+                {gallery.map((image, idx) => (
+                  <CarouselItem key={`${cuatrimoto.id}-${idx}`} className="pl-0 h-full">
+                    <div className="relative h-full w-full">
+                      <Image
+                        src={image}
+                        alt={`${cuatrimoto.nombre} - imagen ${idx + 1}`}
+                        fill
+                        className="object-cover"
+                        unoptimized={image.startsWith('data:')}
+                      />
+                    </div>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              {gallery.length > 1 && (
+                <>
+                  <CarouselPrevious className="left-3 top-1/2 -translate-y-1/2 h-8 w-8 border-border/70 bg-background/70 backdrop-blur-sm" />
+                  <CarouselNext className="right-3 top-1/2 -translate-y-1/2 h-8 w-8 border-border/70 bg-background/70 backdrop-blur-sm" />
+                </>
+              )}
+            </Carousel>
             <Badge className="absolute top-4 left-4 bg-primary text-primary-foreground">
               Honda
             </Badge>
+            {gallery.length > 1 && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+                {gallery.map((_, idx) => (
+                  <span
+                    key={`modal-dot-${idx}`}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      idx === activeSlide ? 'w-5 bg-primary' : 'w-1.5 bg-white/80'
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Content */}
@@ -92,6 +144,15 @@ export function ProductModal({ cuatrimoto, isOpen, onClose, onComprar }: Product
 
             <div className="text-3xl font-bold text-primary mt-4">
               {formatPrice(cuatrimoto.precio)}
+            </div>
+
+            <div className={`mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border ${
+              cuatrimoto.disponible
+                ? 'bg-green-500/15 border-green-500/30 text-green-400'
+                : 'bg-red-500/15 border-red-500/30 text-red-400'
+            }`}>
+              <span className={`h-2 w-2 rounded-full ${cuatrimoto.disponible ? 'bg-green-500' : 'bg-red-500'}`} />
+              {cuatrimoto.disponible ? 'Disponible para entrega inmediata' : 'Agotado temporalmente'}
             </div>
 
             <p className="text-muted-foreground mt-4 leading-relaxed">
@@ -112,6 +173,29 @@ export function ProductModal({ cuatrimoto, isOpen, onClose, onComprar }: Product
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* Ficha tecnica */}
+            <div className="mt-6">
+              <h4 className="text-sm font-semibold text-muted-foreground mb-3">
+                FICHA TECNICA
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  { label: 'Suspension', value: ficha.suspension },
+                  { label: 'Transmision', value: ficha.transmision },
+                  { label: 'Velocidad', value: ficha.velocidad },
+                  { label: 'Peso', value: ficha.peso },
+                  { label: 'Tanque', value: ficha.tanque },
+                  { label: 'Arranque', value: ficha.arranque },
+                  { label: 'Enfriamiento', value: ficha.enfriamiento },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-lg border border-border/70 bg-secondary/45 p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{item.label}</p>
+                    <p className="text-sm font-semibold text-card-foreground mt-1">{item.value}</p>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Beneficios */}
@@ -138,7 +222,7 @@ export function ProductModal({ cuatrimoto, isOpen, onClose, onComprar }: Product
                 disabled={!cuatrimoto.disponible}
               >
                 <ShoppingCart className="w-5 h-5 mr-2" />
-                {cuatrimoto.disponible ? 'Apartar Ahora' : 'Producto Agotado'}
+                {cuatrimoto.disponible ? 'Comprar' : 'Producto Agotado'}
               </Button>
             </div>
           </div>
