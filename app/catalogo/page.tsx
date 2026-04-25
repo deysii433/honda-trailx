@@ -220,6 +220,7 @@ export default function CatalogoPage() {
             Todas ({categoryCounts.todas})
           </Button>
           {CATEGORIAS.map((cat) => {
+            if ((categoryCounts[cat.value] ?? 0) === 0) return null
             const Icon = CATEGORIA_ICONS[cat.value]
             return (
               <Button

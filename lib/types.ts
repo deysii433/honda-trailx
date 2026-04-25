@@ -1,5 +1,7 @@
 export type CategoriaVehiculo = 'cuatrimoto' | 'moto' | 'pioneer'
 
+export type TipoEntrega = 'inmediata' | 'pedido'
+
 export interface FichaTecnica {
   suspension: string
   transmision: string
@@ -24,6 +26,7 @@ export interface Vehiculo {
   combustible: string // Ej: "Gasolina", "Sin plomo"
   descripcion: string
   fichaTecnica?: FichaTecnica
+  tipoEntrega?: TipoEntrega
   disponible: boolean
 }
 

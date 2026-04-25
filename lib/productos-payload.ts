@@ -1,6 +1,7 @@
 import type { CategoriaVehiculo } from './types'
 
 const CATEGORIAS: CategoriaVehiculo[] = ['cuatrimoto', 'moto', 'pioneer']
+const TIPOS_ENTREGA = ['inmediata', 'pedido'] as const
 
 export type ProductoValidationError = { field: string; message: string }
 
@@ -62,6 +63,12 @@ export function bodyToProductoRow(
   const descripcion = String(b.descripcion ?? '').trim()
   if (!descripcion) return { error: { field: 'descripcion', message: 'Descripción requerida' } }
 
+  const tipoEntregaRaw = b.tipo_entrega ?? b.tipoEntrega
+  const tipoEntrega =
+    typeof tipoEntregaRaw === 'string' && (TIPOS_ENTREGA as readonly string[]).includes(tipoEntregaRaw)
+      ? tipoEntregaRaw
+      : 'inmediata'
+
   const disponible = typeof b.disponible === 'boolean' ? b.disponible : true
 
   const row = {
@@ -77,6 +84,7 @@ export function bodyToProductoRow(
     combustible,
     descripcion,
     ficha_tecnica: parseFichaTecnica(b),
+    tipo_entrega: tipoEntrega,
     disponible,
   }
   return { row }

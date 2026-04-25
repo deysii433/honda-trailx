@@ -14,6 +14,7 @@ create table if not exists public.productos (
   combustible text not null,
   descripcion text not null,
   ficha_tecnica jsonb,
+  tipo_entrega text not null default 'inmediata' check (tipo_entrega in ('inmediata', 'pedido')),
   disponible boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

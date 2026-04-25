@@ -28,7 +28,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Cuatrimoto, CategoriaVehiculo, CATEGORIAS, FichaTecnica } from '@/lib/types'
+import { Cuatrimoto, CategoriaVehiculo, CATEGORIAS, FichaTecnica, TipoEntrega } from '@/lib/types'
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
 import { 
   AlertCircle,
@@ -95,6 +95,7 @@ export default function AdminPage() {
     año: new Date().getFullYear().toString(),
     combustible: 'Gasolina',
     descripcion: '',
+    tipoEntrega: 'inmediata' as TipoEntrega,
     fichaTecnica: {
       suspension: '',
       transmision: '',
@@ -134,6 +135,7 @@ export default function AdminPage() {
       año: new Date().getFullYear().toString(),
       combustible: 'Gasolina',
       descripcion: '',
+      tipoEntrega: 'inmediata',
       fichaTecnica: {
         suspension: '',
         transmision: '',
@@ -200,6 +202,7 @@ export default function AdminPage() {
       año: formData.año,
       combustible: formData.combustible,
       descripcion: formData.descripcion,
+      tipoEntrega: formData.tipoEntrega,
       fichaTecnica: normalizeFichaTecnica(formData.fichaTecnica) ?? undefined,
       disponible: formData.disponible,
     }
@@ -237,6 +240,7 @@ export default function AdminPage() {
       año: producto.año,
       combustible: producto.combustible,
       descripcion: producto.descripcion,
+      tipoEntrega: producto.tipoEntrega ?? 'inmediata',
       fichaTecnica: producto.fichaTecnica ?? {
         suspension: '',
         transmision: '',
@@ -268,6 +272,7 @@ export default function AdminPage() {
       año: formData.año,
       combustible: formData.combustible,
       descripcion: formData.descripcion,
+      tipoEntrega: formData.tipoEntrega,
       fichaTecnica: normalizeFichaTecnica(formData.fichaTecnica) ?? undefined,
       disponible: formData.disponible,
     }
@@ -761,6 +766,33 @@ export default function AdminPage() {
                 </div>
               </div>
 
+              <div className="space-y-2 rounded-lg border border-border/70 bg-secondary/30 p-4">
+                <Label className="font-medium">Tipo de entrega</Label>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={formData.tipoEntrega === 'inmediata' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setFormData({ ...formData, tipoEntrega: 'inmediata' })}
+                  >
+                    Entrega inmediata
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={formData.tipoEntrega === 'pedido' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setFormData({ ...formData, tipoEntrega: 'pedido' })}
+                  >
+                    Por pedido
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {formData.tipoEntrega === 'inmediata'
+                    ? 'Se muestra como entrega inmediata en el catálogo.'
+                    : 'Se muestra como por pedido (tiempo a confirmar).'}
+                </p>
+              </div>
+
               <div className="flex items-center justify-between p-4 bg-secondary/50 rounded-lg">
                 <div>
                   <Label htmlFor="disponible" className="font-medium">Disponibilidad</Label>
@@ -1003,6 +1035,33 @@ export default function AdminPage() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="space-y-2 rounded-lg border border-border/70 bg-secondary/30 p-4">
+              <Label className="font-medium">Tipo de entrega</Label>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant={formData.tipoEntrega === 'inmediata' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setFormData({ ...formData, tipoEntrega: 'inmediata' })}
+                >
+                  Entrega inmediata
+                </Button>
+                <Button
+                  type="button"
+                  variant={formData.tipoEntrega === 'pedido' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setFormData({ ...formData, tipoEntrega: 'pedido' })}
+                >
+                  Por pedido
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {formData.tipoEntrega === 'inmediata'
+                  ? 'Se muestra como entrega inmediata en el catálogo.'
+                  : 'Se muestra como por pedido (tiempo a confirmar).'}
+              </p>
             </div>
 
             <div className="flex items-center justify-between p-4 bg-secondary/50 rounded-lg">

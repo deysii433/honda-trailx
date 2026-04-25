@@ -1,4 +1,4 @@
-import { FichaTecnica, Vehiculo } from './types'
+import { FichaTecnica, TipoEntrega, Vehiculo } from './types'
 
 type ProductoRow = {
   id: string
@@ -14,6 +14,7 @@ type ProductoRow = {
   combustible: string
   descripcion: string
   ficha_tecnica: FichaTecnica | null
+  tipo_entrega: TipoEntrega | null
   disponible: boolean
 }
 
@@ -32,6 +33,7 @@ export function mapProductoRowToVehiculo(row: ProductoRow): Vehiculo {
     combustible: row.combustible,
     descripcion: row.descripcion,
     fichaTecnica: row.ficha_tecnica ?? undefined,
+    tipoEntrega: row.tipo_entrega ?? undefined,
     disponible: row.disponible,
   }
 }

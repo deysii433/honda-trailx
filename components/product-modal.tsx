@@ -160,7 +160,11 @@ export function ProductModal({ cuatrimoto, isOpen, onClose, onComprar }: Product
                 : 'bg-red-500/15 border-red-500/30 text-red-400'
             }`}>
               <span className={`h-2 w-2 rounded-full ${cuatrimoto.disponible ? 'bg-green-500' : 'bg-red-500'}`} />
-              {cuatrimoto.disponible ? 'Disponible para entrega inmediata' : 'Agotado temporalmente'}
+              {cuatrimoto.disponible
+                ? (cuatrimoto.tipoEntrega ?? 'inmediata') === 'pedido'
+                  ? 'Disponible por pedido'
+                  : 'Disponible para entrega inmediata'
+                : 'Agotado temporalmente'}
             </div>
 
             <p className="text-muted-foreground mt-4 leading-relaxed">
