@@ -140,7 +140,6 @@ export function ProductCard({ cuatrimoto, onVerMas, onComprar, featuredTag }: Pr
           <h3 className="text-xl font-bold text-card-foreground group-hover:text-primary transition-colors">
             {cuatrimoto.nombre}
           </h3>
-          <span className={`h-2.5 w-2.5 rounded-full ${cuatrimoto.disponible ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)]' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.55)]'}`} />
         </div>
 
         <div className="text-2xl font-bold text-primary mt-2">

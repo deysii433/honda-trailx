@@ -28,7 +28,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Cuatrimoto, CategoriaVehiculo, CATEGORIAS } from '@/lib/types'
+import { Cuatrimoto, CategoriaVehiculo, CATEGORIAS, FichaTecnica } from '@/lib/types'
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
 import { 
   AlertCircle,
@@ -95,6 +95,15 @@ export default function AdminPage() {
     año: new Date().getFullYear().toString(),
     combustible: 'Gasolina',
     descripcion: '',
+    fichaTecnica: {
+      suspension: '',
+      transmision: '',
+      velocidad: '',
+      peso: '',
+      tanque: '',
+      arranque: '',
+      enfriamiento: '',
+    } as FichaTecnica,
     disponible: true,
   })
 
@@ -125,8 +134,25 @@ export default function AdminPage() {
       año: new Date().getFullYear().toString(),
       combustible: 'Gasolina',
       descripcion: '',
+      fichaTecnica: {
+        suspension: '',
+        transmision: '',
+        velocidad: '',
+        peso: '',
+        tanque: '',
+        arranque: '',
+        enfriamiento: '',
+      },
       disponible: true,
     })
+  }
+
+  const normalizeFichaTecnica = (ft: FichaTecnica) => {
+    const trimmed = Object.fromEntries(
+      Object.entries(ft).map(([k, v]) => [k, String(v ?? '').trim()])
+    ) as FichaTecnica
+    const hasAny = Object.values(trimmed).some((v) => v.length > 0)
+    return hasAny ? trimmed : null
   }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -174,6 +200,7 @@ export default function AdminPage() {
       año: formData.año,
       combustible: formData.combustible,
       descripcion: formData.descripcion,
+      fichaTecnica: normalizeFichaTecnica(formData.fichaTecnica) ?? undefined,
       disponible: formData.disponible,
     }
 
@@ -210,6 +237,15 @@ export default function AdminPage() {
       año: producto.año,
       combustible: producto.combustible,
       descripcion: producto.descripcion,
+      fichaTecnica: producto.fichaTecnica ?? {
+        suspension: '',
+        transmision: '',
+        velocidad: '',
+        peso: '',
+        tanque: '',
+        arranque: '',
+        enfriamiento: '',
+      },
       disponible: producto.disponible,
     })
     setIsEditModalOpen(true)
@@ -232,6 +268,7 @@ export default function AdminPage() {
       año: formData.año,
       combustible: formData.combustible,
       descripcion: formData.descripcion,
+      fichaTecnica: normalizeFichaTecnica(formData.fichaTecnica) ?? undefined,
       disponible: formData.disponible,
     }
 
@@ -689,6 +726,41 @@ export default function AdminPage() {
                 />
               </div>
 
+              <div className="space-y-3 rounded-lg border border-border/70 bg-secondary/30 p-4">
+                <div>
+                  <Label className="font-medium">Ficha técnica (opcional)</Label>
+                  <p className="text-sm text-muted-foreground">Esto se mostrará en el modal de “Ver más”.</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {(
+                    [
+                      ['suspension', 'Suspensión'],
+                      ['transmision', 'Transmisión'],
+                      ['velocidad', 'Velocidad'],
+                      ['peso', 'Peso'],
+                      ['tanque', 'Tanque'],
+                      ['arranque', 'Arranque'],
+                      ['enfriamiento', 'Enfriamiento'],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <div key={key} className="space-y-2">
+                      <Label htmlFor={`ft-${key}`}>{label}</Label>
+                      <Input
+                        id={`ft-${key}`}
+                        value={formData.fichaTecnica[key]}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            fichaTecnica: { ...formData.fichaTecnica, [key]: e.target.value },
+                          })
+                        }
+                        className="bg-input"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex items-center justify-between p-4 bg-secondary/50 rounded-lg">
                 <div>
                   <Label htmlFor="disponible" className="font-medium">Disponibilidad</Label>
@@ -896,6 +968,41 @@ export default function AdminPage() {
                 rows={3}
                 className="bg-input resize-none"
               />
+            </div>
+
+            <div className="space-y-3 rounded-lg border border-border/70 bg-secondary/30 p-4">
+              <div>
+                <Label className="font-medium">Ficha técnica (opcional)</Label>
+                <p className="text-sm text-muted-foreground">Se verá en el modal de “Ver más”.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {(
+                  [
+                    ['suspension', 'Suspensión'],
+                    ['transmision', 'Transmisión'],
+                    ['velocidad', 'Velocidad'],
+                    ['peso', 'Peso'],
+                    ['tanque', 'Tanque'],
+                    ['arranque', 'Arranque'],
+                    ['enfriamiento', 'Enfriamiento'],
+                  ] as const
+                ).map(([key, label]) => (
+                  <div key={key} className="space-y-2">
+                    <Label htmlFor={`edit-ft-${key}`}>{label}</Label>
+                    <Input
+                      id={`edit-ft-${key}`}
+                      value={formData.fichaTecnica[key]}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          fichaTecnica: { ...formData.fichaTecnica, [key]: e.target.value },
+                        })
+                      }
+                      className="bg-input"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="flex items-center justify-between p-4 bg-secondary/50 rounded-lg">

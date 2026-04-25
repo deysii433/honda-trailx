@@ -26,6 +26,14 @@ export function ProductModal({ cuatrimoto, isOpen, onClose, onComprar }: Product
 
   if (!cuatrimoto) return null
 
+  const cleanDescripcion = (value: string) => {
+    // Limpia texto basura accidental (sin romper descripciones normales)
+    return value
+      .replaceAll('{pjfaoifhlk<cnsd,', '')
+      .replaceAll('pjfaoifhlk<cnsd,', '')
+      .trim()
+  }
+
   const formatPrice = (precio: number) => {
     return new Intl.NumberFormat('es-MX', {
       style: 'currency',
@@ -156,7 +164,7 @@ export function ProductModal({ cuatrimoto, isOpen, onClose, onComprar }: Product
             </div>
 
             <p className="text-muted-foreground mt-4 leading-relaxed">
-              {cuatrimoto.descripcion}
+              {cleanDescripcion(cuatrimoto.descripcion)}
             </p>
 
             {/* Características */}
