@@ -76,9 +76,9 @@ export function ProductModal({ cuatrimoto, isOpen, onClose, onComprar }: Product
     arranque: 'Electrico',
     enfriamiento: 'Liquido',
   }
-  const gallery = cuatrimoto.imagenes && cuatrimoto.imagenes.length > 0
-    ? cuatrimoto.imagenes
-    : [cuatrimoto.imagen]
+  const gallery = (
+    cuatrimoto.imagenes && cuatrimoto.imagenes.length > 0 ? cuatrimoto.imagenes : [cuatrimoto.imagen]
+  ).filter((img): img is string => typeof img === 'string' && img.length > 0)
 
   useEffect(() => {
     if (!isOpen) return

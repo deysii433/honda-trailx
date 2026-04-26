@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -77,6 +77,7 @@ export default function AdminPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [productos, setProductos] = useState<Cuatrimoto[]>([])
   const [apartados, setApartados] = useState<ApartadoRow[]>([])
+  const [solicitudesDate, setSolicitudesDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [listError, setListError] = useState('')
   const [formError, setFormError] = useState('')
 
@@ -144,6 +145,14 @@ export default function AdminPage() {
     if (activeTab !== 'solicitudes') return
     void fetchApartados()
   }, [activeTab])
+
+  const apartadosDelDia = useMemo(() => {
+    const target = solicitudesDate
+    return apartados.filter((row) => {
+      const day = new Date(row.fecha).toISOString().slice(0, 10)
+      return day === target
+    })
+  }, [apartados, solicitudesDate])
 
   const handleLogout = async () => {
     try {
@@ -217,6 +226,16 @@ export default function AdminPage() {
       const nextImages = exists ? prev.imagenes.filter((x) => x !== img) : [...prev.imagenes, img]
       const safeImages = nextImages.length > 0 ? nextImages : [prev.imagen]
       return { ...prev, imagenes: safeImages, imagen: safeImages[0] }
+    })
+  }
+
+  const deleteImage = (img: string) => {
+    setCustomImages((prev) => prev.filter((x) => x !== img))
+    setFormData((prev) => {
+      const nextImages = prev.imagenes.filter((x) => x !== img)
+      const safeImages = nextImages.length > 0 ? nextImages : [prev.imagen]
+      const nextMain = prev.imagen === img ? safeImages[0] : prev.imagen
+      return { ...prev, imagenes: safeImages, imagen: nextMain }
     })
   }
 
@@ -636,12 +655,20 @@ export default function AdminPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-xl font-bold text-card-foreground">Solicitudes / Mensajes</h2>
-              <Button variant="outline" size="sm" onClick={fetchApartados}>
-                Actualizar
-              </Button>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="date"
+                  value={solicitudesDate}
+                  onChange={(e) => setSolicitudesDate(e.target.value)}
+                  className="w-[165px]"
+                />
+                <Button variant="outline" size="sm" onClick={fetchApartados}>
+                  Actualizar
+                </Button>
+              </div>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {apartados.map((row) => (
+              {apartadosDelDia.map((row) => (
                 <Card key={row.id} className="bg-card border-border p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -675,9 +702,9 @@ export default function AdminPage() {
                 </Card>
               ))}
             </div>
-            {apartados.length === 0 && (
+            {apartadosDelDia.length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
-                No hay solicitudes todavía.
+                No hay solicitudes para este día.
               </div>
             )}
           </div>
@@ -849,6 +876,20 @@ export default function AdminPage() {
                       }`}
                     >
                       <Image src={img} alt="Opción" fill className="object-cover" />
+                      {customImages.includes(img) && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            deleteImage(img)
+                          }}
+                          className="absolute top-1 right-1 z-10 h-6 w-6 rounded-full bg-background/85 border border-border flex items-center justify-center hover:bg-background"
+                          aria-label="Eliminar imagen"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
                       {formData.imagenes.includes(img) && (
                         <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
                           <ImageIcon className="w-6 h-6 text-primary" />

@@ -29,9 +29,9 @@ export function ProductCard({ cuatrimoto, onVerMas, onComprar, featuredTag }: Pr
     }).format(precio)
   }
 
-  const gallery = cuatrimoto.imagenes && cuatrimoto.imagenes.length > 0
-    ? cuatrimoto.imagenes
-    : [cuatrimoto.imagen]
+  const gallery = (
+    cuatrimoto.imagenes && cuatrimoto.imagenes.length > 0 ? cuatrimoto.imagenes : [cuatrimoto.imagen]
+  ).filter((img): img is string => typeof img === 'string' && img.length > 0)
 
   const stopAutoplay = () => {
     if (autoplayTimerRef.current) {
