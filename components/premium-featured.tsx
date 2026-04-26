@@ -7,8 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ProductModal } from '@/components/product-modal'
 import { PurchaseModal } from '@/components/purchase-modal'
-import { Cuatrimoto, CATEGORIAS } from '@/lib/types'
-import { useProductosStore } from '@/lib/store'
+import { Cuatrimoto } from '@/lib/types'
 import {
   ChevronRight,
   Shield,
@@ -19,8 +18,6 @@ import {
   Cog,
   Calendar,
 } from 'lucide-react'
-
-const PREMIUM_IDS = ['4', '7', '10']
 
 const categoriaMeta: Record<string, { label: string; tagline: string; accent: string }> = {
   cuatrimoto: {
@@ -41,7 +38,7 @@ const categoriaMeta: Record<string, { label: string; tagline: string; accent: st
 }
 
 export function PremiumFeatured() {
-  const productos = useProductosStore((state) => state.productos)
+  const [productos, setProductos] = useState<Cuatrimoto[]>([])
   const [selectedProduct, setSelectedProduct] = useState<Cuatrimoto | null>(null)
   const [purchaseProduct, setPurchaseProduct] = useState<Cuatrimoto | null>(null)
   const [isProductModalOpen, setIsProductModalOpen] = useState(false)
@@ -49,9 +46,23 @@ export function PremiumFeatured() {
   const [visibleCards, setVisibleCards] = useState<Set<string>>(new Set())
   const sectionRef = useRef<HTMLElement>(null)
 
-  const premiumProducts = PREMIUM_IDS.map(id =>
-    productos.find(p => p.id === id)
-  ).filter(Boolean) as Cuatrimoto[]
+  useEffect(() => {
+    const fetchProductos = async () => {
+      try {
+        const response = await fetch('/api/productos', { cache: 'no-store' })
+        if (!response.ok) return
+        const data = (await response.json()) as Cuatrimoto[]
+        setProductos(Array.isArray(data) ? data : [])
+      } catch {
+        setProductos([])
+      }
+    }
+    void fetchProductos()
+  }, [])
+
+  const premiumProducts = [...productos]
+    .sort((a, b) => (b.visitas ?? 0) - (a.visitas ?? 0))
+    .slice(0, 3)
 
   useEffect(() => {
     const observer = new IntersectionObserver(

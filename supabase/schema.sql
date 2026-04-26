@@ -15,10 +15,20 @@ create table if not exists public.productos (
   descripcion text not null,
   ficha_tecnica jsonb,
   tipo_entrega text not null default 'inmediata' check (tipo_entrega in ('inmediata', 'pedido')),
+  visitas integer not null default 0,
   disponible boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create or replace function public.increment_producto_visitas(p_id uuid)
+returns void
+language sql
+as $$
+  update public.productos
+  set visitas = visitas + 1
+  where id = p_id;
+$$;
 
 create table if not exists public.clientes (
   id uuid primary key default gen_random_uuid(),

@@ -118,9 +118,13 @@ export default function CatalogoPage() {
 
   const catalogProducts = useMemo(() => {
     return filteredProducts.map((producto, index) => {
+      const baseGallery =
+        producto.imagenes && producto.imagenes.length > 0 ? producto.imagenes : [producto.imagen]
+
       const sameCategoryImages = productos
         .filter((p) => p.categoria === producto.categoria && p.id !== producto.id)
         .map((p) => p.imagen)
+        .filter((img) => typeof img === 'string' && img.length > 0)
         .slice(0, 2)
 
       const premiumTag =
@@ -128,17 +132,15 @@ export default function CatalogoPage() {
           ? 'Última pieza'
           : index === 0
             ? 'Más vendida'
-            : Number(producto.año) >= filterRanges.maxYear
-              ? 'Nueva llegada'
-              : 'Recomendada'
+            : 'Recomendada'
 
       return {
         ...producto,
-        imagenes: [producto.imagen, ...sameCategoryImages],
+        imagenes: Array.from(new Set([...baseGallery, ...sameCategoryImages])),
         premiumTag,
       } as Cuatrimoto & { imagenes: string[]; premiumTag: string }
     })
-  }, [filteredProducts, productos, filterRanges.maxYear])
+  }, [filteredProducts, productos])
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { todas: productos.length }

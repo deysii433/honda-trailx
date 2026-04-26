@@ -15,6 +15,7 @@ type ProductoRow = {
   descripcion: string
   ficha_tecnica: FichaTecnica | null
   tipo_entrega: TipoEntrega | null
+  visitas: number | null
   disponible: boolean
 }
 
@@ -34,6 +35,7 @@ export function mapProductoRowToVehiculo(row: ProductoRow): Vehiculo {
     descripcion: row.descripcion,
     fichaTecnica: row.ficha_tecnica ?? undefined,
     tipoEntrega: row.tipo_entrega ?? undefined,
+    visitas: row.visitas ?? undefined,
     disponible: row.disponible,
   }
 }

@@ -27,6 +27,7 @@ export interface Vehiculo {
   descripcion: string
   fichaTecnica?: FichaTecnica
   tipoEntrega?: TipoEntrega
+  visitas?: number
   disponible: boolean
 }
 

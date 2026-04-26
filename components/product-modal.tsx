@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Cuatrimoto } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -79,6 +79,11 @@ export function ProductModal({ cuatrimoto, isOpen, onClose, onComprar }: Product
   const gallery = cuatrimoto.imagenes && cuatrimoto.imagenes.length > 0
     ? cuatrimoto.imagenes
     : [cuatrimoto.imagen]
+
+  useEffect(() => {
+    if (!isOpen) return
+    void fetch(`/api/productos/${cuatrimoto.id}/view`, { method: 'POST' }).catch(() => null)
+  }, [cuatrimoto.id, isOpen])
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

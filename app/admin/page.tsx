@@ -53,8 +53,21 @@ const CATEGORIA_ICONS: Record<CategoriaVehiculo, React.ElementType> = {
   pioneer: Truck,
 }
 
+type ApartadoRow = {
+  id: string
+  nombre_producto: string
+  fecha: string
+  monto_apartado: number
+  estado_pedido: string
+  tipo_compra: string
+  metodo_pago: string | null
+  metodo_contacto: string | null
+  mensaje: string | null
+  clientes?: { nombre: string; telefono: string } | null
+}
+
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<'lista' | 'agregar'>('lista')
+  const [activeTab, setActiveTab] = useState<'lista' | 'agregar' | 'visitas' | 'solicitudes'>('lista')
   const [editingProduct, setEditingProduct] = useState<Cuatrimoto | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null)
@@ -63,6 +76,7 @@ export default function AdminPage() {
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [productos, setProductos] = useState<Cuatrimoto[]>([])
+  const [apartados, setApartados] = useState<ApartadoRow[]>([])
   const [listError, setListError] = useState('')
   const [formError, setFormError] = useState('')
 
@@ -111,6 +125,25 @@ export default function AdminPage() {
   useEffect(() => {
     void fetchProductos()
   }, [])
+
+  const fetchApartados = async () => {
+    try {
+      const response = await fetch('/api/apartados', { cache: 'no-store' })
+      const raw = (await response.json().catch(() => ([]))) as ApartadoRow[] | { error?: string }
+      if (!response.ok) {
+        setApartados([])
+        return
+      }
+      setApartados(Array.isArray(raw) ? raw : [])
+    } catch {
+      setApartados([])
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab !== 'solicitudes') return
+    void fetchApartados()
+  }, [activeTab])
 
   const handleLogout = async () => {
     try {
@@ -435,6 +468,26 @@ export default function AdminPage() {
             Productos
           </Button>
           <Button
+            variant={activeTab === 'visitas' ? 'default' : 'outline'}
+            onClick={() => {
+              setFormError('')
+              setActiveTab('visitas')
+            }}
+          >
+            <Eye className="w-4 h-4 mr-2" />
+            Más visitadas
+          </Button>
+          <Button
+            variant={activeTab === 'solicitudes' ? 'default' : 'outline'}
+            onClick={() => {
+              setFormError('')
+              setActiveTab('solicitudes')
+            }}
+          >
+            <AlertCircle className="w-4 h-4 mr-2" />
+            Solicitudes
+          </Button>
+          <Button
             variant={activeTab === 'agregar' ? 'default' : 'outline'}
             onClick={() => {
               resetForm()
@@ -540,6 +593,94 @@ export default function AdminPage() {
               </div>
             )}
           </>
+        )}
+
+        {activeTab === 'visitas' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-xl font-bold text-card-foreground">Productos más visitados</h2>
+              <Button variant="outline" size="sm" onClick={fetchProductos}>
+                Actualizar
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[...productos]
+                .sort((a, b) => (b.visitas ?? 0) - (a.visitas ?? 0))
+                .map((producto) => (
+                  <Card key={`visitas-${producto.id}`} className="bg-card border-border overflow-hidden">
+                    <div className="relative aspect-video bg-muted">
+                      <Image src={producto.imagen} alt={producto.nombre} fill className="object-cover" />
+                      <div className="absolute top-3 left-3 flex flex-col gap-1">
+                        <Badge className="bg-primary/90 text-primary-foreground">
+                          {(producto.visitas ?? 0).toLocaleString('es-MX')} visitas
+                        </Badge>
+                        <Badge variant="secondary" className="capitalize">
+                          {getCategoriaLabel(producto.categoria)}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="p-4">
+                      <h3 className="font-bold text-card-foreground">{producto.nombre}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Honda | {producto.motor}cc | {producto.año}
+                      </p>
+                      <p className="text-lg font-bold text-primary mt-2">{formatPrice(producto.precio)}</p>
+                    </div>
+                  </Card>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'solicitudes' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-xl font-bold text-card-foreground">Solicitudes / Mensajes</h2>
+              <Button variant="outline" size="sm" onClick={fetchApartados}>
+                Actualizar
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {apartados.map((row) => (
+                <Card key={row.id} className="bg-card border-border p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-card-foreground">{row.nombre_producto}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {row.clientes?.nombre ?? 'Cliente'} · {row.clientes?.telefono ?? 'Sin teléfono'}
+                      </p>
+                    </div>
+                    <Badge variant="secondary" className="capitalize">
+                      {row.tipo_compra}
+                    </Badge>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                    <div className="rounded-lg border border-border/70 bg-secondary/30 p-2">
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Estado</p>
+                      <p className="font-semibold text-card-foreground capitalize">{row.estado_pedido}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 bg-secondary/30 p-2">
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Monto</p>
+                      <p className="font-semibold text-card-foreground">
+                        {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(row.monto_apartado ?? 0))}
+                      </p>
+                    </div>
+                  </div>
+                  {row.mensaje && (
+                    <div className="mt-3 rounded-lg border border-border/70 bg-secondary/30 p-3">
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Mensaje</p>
+                      <p className="text-sm text-card-foreground mt-1 whitespace-pre-wrap">{row.mensaje}</p>
+                    </div>
+                  )}
+                </Card>
+              ))}
+            </div>
+            {apartados.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground">
+                No hay solicitudes todavía.
+              </div>
+            )}
+          </div>
         )}
 
         {/* Add Product Form */}
