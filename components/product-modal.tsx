@@ -24,11 +24,17 @@ interface ProductModalProps {
 export function ProductModal({ cuatrimoto, isOpen, onClose, onComprar }: ProductModalProps) {
   const [activeSlide, setActiveSlide] = useState(0)
 
+  // Los hooks deben ir antes de cualquier "return": si no, React truena al abrir el modal
+  useEffect(() => {
+    if (!isOpen || !cuatrimoto) return
+    void fetch(`/api/productos/${cuatrimoto.id}/view`, { method: 'POST' }).catch(() => null)
+  }, [cuatrimoto?.id, isOpen])
+
   if (!cuatrimoto) return null
 
-  const cleanDescripcion = (value: string) => {
+  const cleanDescripcion = (value: string | null | undefined) => {
     // Limpia texto basura accidental (sin romper descripciones normales)
-    return value
+    return (value ?? '')
       .replaceAll('{pjfaoifhlk<cnsd,', '')
       .replaceAll('pjfaoifhlk<cnsd,', '')
       .trim()
@@ -79,11 +85,6 @@ export function ProductModal({ cuatrimoto, isOpen, onClose, onComprar }: Product
   const gallery = (
     cuatrimoto.imagenes && cuatrimoto.imagenes.length > 0 ? cuatrimoto.imagenes : [cuatrimoto.imagen]
   ).filter((img): img is string => typeof img === 'string' && img.length > 0)
-
-  useEffect(() => {
-    if (!isOpen) return
-    void fetch(`/api/productos/${cuatrimoto.id}/view`, { method: 'POST' }).catch(() => null)
-  }, [cuatrimoto.id, isOpen])
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
