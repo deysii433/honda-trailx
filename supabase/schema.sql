@@ -88,3 +88,8 @@ insert into public.admin_info (clave, valor)
 values
   ('negocio', jsonb_build_object('nombre', 'Honda Cuatrimotos México', 'telefono', '+52 777 457 4497', 'email', 'ventas@hondacuatrimotos.mx'))
 on conflict (clave) do nothing;
+
+alter table public.productos  enable row level security;
+alter table public.clientes   enable row level security;
+alter table public.apartados  enable row level security;
+alter table public.admin_info enable row level security;
