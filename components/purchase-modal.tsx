@@ -36,6 +36,8 @@ export function PurchaseModal({ cuatrimoto, isOpen, onClose }: PurchaseModalProp
     mensaje: '',
   })
   const [isSubmitted, setIsSubmitted] = useState(false)
+  const [errorEnvio, setErrorEnvio] = useState('')
+  const [enviando, setEnviando] = useState(false)
 
   if (!cuatrimoto) return null
 
@@ -61,7 +63,21 @@ export function PurchaseModal({ cuatrimoto, isOpen, onClose }: PurchaseModalProp
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+    if (enviando) return
+    setErrorEnvio('')
+
+    // Revisión rápida en el navegador (el servidor vuelve a validar todo)
+    if (formData.nombre.trim().length < 2) {
+      setErrorEnvio('Escribe tu nombre completo.')
+      return
+    }
+    const digitos = formData.telefono.replace(/\D/g, '')
+    const telefono10 = digitos.length === 12 && digitos.startsWith('52') ? digitos.slice(2) : digitos
+    if (telefono10.length !== 10) {
+      setErrorEnvio('Escribe tu teléfono a 10 dígitos, por ejemplo: 55 1234 5678.')
+      return
+    }
+
     const engancheInfo = engancheOpciones.find(e => e.value === formData.enganche)
     const montoEnganche = engancheInfo ? formatPrice(engancheInfo.monto) : 'Por definir'
     const restante = engancheInfo ? formatPrice(cuatrimoto.precio - engancheInfo.monto) : formatPrice(cuatrimoto.precio)
@@ -92,28 +108,43 @@ ${formData.mensaje ? `Comentarios: ${formData.mensaje}` : ''}
       ? engancheInfo?.monto ?? 0
       : cuatrimoto.precio
 
-    await fetch('/api/apartados', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        clienteId: null,
-        productoId: cuatrimoto.id,
-        nombreProducto: cuatrimoto.nombre,
-        nombreCliente: formData.nombre,
-        telefono: formData.telefono,
-        fecha: new Date().toISOString(),
-        montoApartado,
-        estadoPedido: 'pendiente',
-        tipoCompra: formData.tipoCompra,
-        metodoPago: formData.metodoPago || null,
-        metodoContacto: formData.metodoContacto,
-        mensaje: formData.mensaje || null,
-      }),
-    })
+    setEnviando(true)
 
+    let respuesta: Response | null = null
+    try {
+      respuesta = await fetch('/api/apartados', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productoId: cuatrimoto.id,
+          nombreCliente: formData.nombre,
+          telefono: formData.telefono,
+          montoApartado,
+          tipoCompra: formData.tipoCompra,
+          metodoPago: formData.metodoPago || null,
+          metodoContacto: formData.metodoContacto,
+          mensaje: formData.mensaje || null,
+        }),
+      })
+    } catch {
+      respuesta = null // sin conexión con el servidor
+    }
+
+    // Datos inválidos (400) o producto no encontrado (404): mostrar el error para que lo corrija
+    if (respuesta && (respuesta.status === 400 || respuesta.status === 404)) {
+      const datos = await respuesta.json().catch(() => null)
+      setErrorEnvio(datos?.error ?? 'Revisa tus datos e intenta de nuevo.')
+      setEnviando(false)
+      return
+    }
+
+    // Guardado (201), límite (429), error del servidor o sin conexión:
+    // igual lo mandamos a WhatsApp para no perder al cliente
     const whatsappUrl = `https://wa.me/52${informacionNegocio.whatsapp}?text=${encodeURIComponent(mensaje)}`
-    window.open(whatsappUrl, '_blank')
+    const ventana = window.open(whatsappUrl, '_blank')
+    if (!ventana) window.location.href = whatsappUrl // si el navegador bloqueó la ventana nueva
 
+    setEnviando(false)
     setIsSubmitted(true)
   }
 
@@ -129,6 +160,8 @@ ${formData.mensaje ? `Comentarios: ${formData.mensaje}` : ''}
       mensaje: '',
     })
     setIsSubmitted(false)
+    setErrorEnvio('')
+    setEnviando(false)
     onClose()
   }
 
@@ -363,7 +396,10 @@ ${formData.mensaje ? `Comentarios: ${formData.mensaje}` : ''}
                           id="nombre"
                           placeholder="Tu nombre completo"
                           value={formData.nombre}
-                          onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                          onChange={(e) => {
+                            setFormData({ ...formData, nombre: e.target.value })
+                            setErrorEnvio('')
+                          }}
                           required
                           className="bg-input"
                         />
@@ -375,7 +411,10 @@ ${formData.mensaje ? `Comentarios: ${formData.mensaje}` : ''}
                           type="tel"
                           placeholder="Ej: 55 1234 5678"
                           value={formData.telefono}
-                          onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                          onChange={(e) => {
+                            setFormData({ ...formData, telefono: e.target.value })
+                            setErrorEnvio('')
+                          }}
                           required
                           className="bg-input"
                         />
@@ -393,21 +432,34 @@ ${formData.mensaje ? `Comentarios: ${formData.mensaje}` : ''}
                       </div>
                     </div>
 
+                    {errorEnvio && (
+                      <p
+                        role="alert"
+                        className="text-sm text-destructive rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2"
+                      >
+                        {errorEnvio}
+                      </p>
+                    )}
+
                     <div className="flex gap-3">
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => setStep(1)}
+                        onClick={() => {
+                          setErrorEnvio('')
+                          setStep(1)
+                        }}
                         className="flex-1"
+                        disabled={enviando}
                       >
                         Atrás
                       </Button>
                       <Button
                         type="submit"
                         className="flex-1"
-                        disabled={!formData.nombre || !formData.telefono || (formData.tipoCompra === 'comprar' && !formData.metodoPago) || (formData.tipoCompra === 'apartar' && !formData.enganche)}
+                        disabled={enviando || !formData.nombre || !formData.telefono || (formData.tipoCompra === 'comprar' && !formData.metodoPago) || (formData.tipoCompra === 'apartar' && !formData.enganche)}
                       >
-                        Enviar a WhatsApp
+                        {enviando ? 'Enviando…' : 'Enviar a WhatsApp'}
                       </Button>
                     </div>
                   </>
