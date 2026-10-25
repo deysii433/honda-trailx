@@ -45,6 +45,9 @@ import {
   Bike,
   Truck,
   CheckCircle2,
+  Clock,
+  MessageCircle,
+  Phone,
 } from 'lucide-react'
 
 const CATEGORIA_ICONS: Record<CategoriaVehiculo, React.ElementType> = {
@@ -66,6 +69,35 @@ type ApartadoRow = {
   clientes?: { nombre: string; telefono: string } | null
 }
 
+// ---- Solicitudes: estados, fechas y contacto ----
+const ESTADOS_PEDIDO: { value: string; label: string; clase: string }[] = [
+  { value: 'pendiente', label: 'Pendiente', clase: 'border-yellow-500/40 bg-yellow-500/15 text-yellow-400' },
+  { value: 'confirmado', label: 'Confirmado', clase: 'border-blue-500/40 bg-blue-500/15 text-blue-400' },
+  { value: 'liquidado', label: 'Liquidado', clase: 'border-green-500/40 bg-green-500/15 text-green-400' },
+  { value: 'cancelado', label: 'Cancelado', clase: 'border-red-500/40 bg-red-500/15 text-red-400' },
+]
+
+const ETIQUETAS_PAGO: Record<string, string> = {
+  efectivo: 'Efectivo',
+  transferencia: 'Transferencia',
+  deposito: 'Depósito bancario',
+}
+
+// Fecha YYYY-MM-DD en la hora local (no en UTC), para que el filtro por día coincida con México
+function fechaLocal(fecha: Date) {
+  const y = fecha.getFullYear()
+  const m = String(fecha.getMonth() + 1).padStart(2, '0')
+  const d = String(fecha.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+// Número para WhatsApp: 10 dígitos de México → se le agrega 52
+function numeroWhatsApp(telefono: string) {
+  const digitos = telefono.replace(/\D/g, '')
+  if (digitos.length === 10) return `52${digitos}`
+  return digitos
+}
+
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'lista' | 'agregar' | 'visitas' | 'solicitudes'>('lista')
   const [editingProduct, setEditingProduct] = useState<Cuatrimoto | null>(null)
@@ -77,7 +109,9 @@ export default function AdminPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [productos, setProductos] = useState<Cuatrimoto[]>([])
   const [apartados, setApartados] = useState<ApartadoRow[]>([])
-  const [solicitudesDate, setSolicitudesDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [solicitudesDate, setSolicitudesDate] = useState(() => fechaLocal(new Date()))
+  const [estadoGuardando, setEstadoGuardando] = useState<string | null>(null)
+  const [errorEstado, setErrorEstado] = useState('')
   const [listError, setListError] = useState('')
   const [formError, setFormError] = useState('')
 
@@ -148,11 +182,33 @@ export default function AdminPage() {
 
   const apartadosDelDia = useMemo(() => {
     const target = solicitudesDate
-    return apartados.filter((row) => {
-      const day = new Date(row.fecha).toISOString().slice(0, 10)
-      return day === target
-    })
+    return apartados.filter((row) => fechaLocal(new Date(row.fecha)) === target)
   }, [apartados, solicitudesDate])
+
+  const cambiarEstado = async (id: string, estado: string) => {
+    const anterior = apartados.find((row) => row.id === id)?.estado_pedido
+    if (!anterior || anterior === estado) return
+    setErrorEstado('')
+    setEstadoGuardando(id)
+    // Se cambia en pantalla de inmediato; si falla, se regresa al estado anterior
+    setApartados((rows) => rows.map((row) => (row.id === id ? { ...row, estado_pedido: estado } : row)))
+    try {
+      const response = await fetch('/api/apartados', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, estado }),
+      })
+      if (!response.ok) {
+        const raw = await response.json().catch(() => null)
+        throw new Error(raw?.error ?? 'No se pudo cambiar el estado')
+      }
+    } catch (err) {
+      setApartados((rows) => rows.map((row) => (row.id === id ? { ...row, estado_pedido: anterior } : row)))
+      setErrorEstado(err instanceof Error ? err.message : 'No se pudo cambiar el estado')
+    } finally {
+      setEstadoGuardando(null)
+    }
+  }
 
   const handleLogout = async () => {
     try {
@@ -667,40 +723,106 @@ export default function AdminPage() {
                 </Button>
               </div>
             </div>
+            {errorEstado && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{errorEstado}</AlertDescription>
+              </Alert>
+            )}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {apartadosDelDia.map((row) => (
-                <Card key={row.id} className="bg-card border-border p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-card-foreground">{row.nombre_producto}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {row.clientes?.nombre ?? 'Cliente'} · {row.clientes?.telefono ?? 'Sin teléfono'}
-                      </p>
+              {apartadosDelDia.map((row) => {
+                const estadoInfo = ESTADOS_PEDIDO.find((e) => e.value === row.estado_pedido) ?? ESTADOS_PEDIDO[0]
+                const nombreCliente = row.clientes?.nombre ?? 'Cliente'
+                const telefono = row.clientes?.telefono ?? ''
+                const hora = new Date(row.fecha).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+                const textoWhatsApp = `Hola ${nombreCliente}, te escribimos de Honda sobre tu solicitud para ${row.tipo_compra === 'apartar' ? 'apartar' : 'comprar'} la ${row.nombre_producto}.`
+                return (
+                  <Card key={row.id} className="bg-card border-border p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-card-foreground">{row.nombre_producto}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {nombreCliente} · {telefono || 'Sin teléfono'}
+                        </p>
+                        <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                          <Clock className="w-3.5 h-3.5" />
+                          {hora}
+                        </p>
+                      </div>
+                      <Badge variant="secondary" className="capitalize">
+                        {row.tipo_compra}
+                      </Badge>
                     </div>
-                    <Badge variant="secondary" className="capitalize">
-                      {row.tipo_compra}
-                    </Badge>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                    <div className="rounded-lg border border-border/70 bg-secondary/30 p-2">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Estado</p>
-                      <p className="font-semibold text-card-foreground capitalize">{row.estado_pedido}</p>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                      <div className="rounded-lg border border-border/70 bg-secondary/30 p-2">
+                        <label
+                          htmlFor={`estado-${row.id}`}
+                          className="text-[11px] uppercase tracking-wide text-muted-foreground"
+                        >
+                          Estado
+                        </label>
+                        <select
+                          id={`estado-${row.id}`}
+                          value={row.estado_pedido}
+                          disabled={estadoGuardando === row.id}
+                          onChange={(e) => void cambiarEstado(row.id, e.target.value)}
+                          className={`mt-1 w-full rounded-md border px-2 py-1 font-semibold outline-none disabled:opacity-60 ${estadoInfo.clase}`}
+                        >
+                          {ESTADOS_PEDIDO.map((estado) => (
+                            <option key={estado.value} value={estado.value} className="bg-background text-foreground">
+                              {estado.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="rounded-lg border border-border/70 bg-secondary/30 p-2">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Monto</p>
+                        <p className="font-semibold text-card-foreground">
+                          {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(row.monto_apartado ?? 0))}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-border/70 bg-secondary/30 p-2">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Pago</p>
+                        <p className="font-semibold text-card-foreground">
+                          {row.metodo_pago ? ETIQUETAS_PAGO[row.metodo_pago] ?? row.metodo_pago : 'Por definir'}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-border/70 bg-secondary/30 p-2">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Prefiere</p>
+                        <p className="font-semibold text-card-foreground">
+                          {row.metodo_contacto === 'llamada' ? 'Llamada' : row.metodo_contacto === 'whatsapp' ? 'WhatsApp' : 'Sin indicar'}
+                        </p>
+                      </div>
                     </div>
-                    <div className="rounded-lg border border-border/70 bg-secondary/30 p-2">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Monto</p>
-                      <p className="font-semibold text-card-foreground">
-                        {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(row.monto_apartado ?? 0))}
-                      </p>
-                    </div>
-                  </div>
-                  {row.mensaje && (
-                    <div className="mt-3 rounded-lg border border-border/70 bg-secondary/30 p-3">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Mensaje</p>
-                      <p className="text-sm text-card-foreground mt-1 whitespace-pre-wrap">{row.mensaje}</p>
-                    </div>
-                  )}
-                </Card>
-              ))}
+                    {row.mensaje && (
+                      <div className="mt-3 rounded-lg border border-border/70 bg-secondary/30 p-3">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Mensaje</p>
+                        <p className="text-sm text-card-foreground mt-1 whitespace-pre-wrap">{row.mensaje}</p>
+                      </div>
+                    )}
+                    {telefono && (
+                      <div className="mt-3 flex gap-2">
+                        <Button asChild size="sm" className="flex-1 bg-green-600 hover:bg-green-700 text-white">
+                          <a
+                            href={`https://wa.me/${numeroWhatsApp(telefono)}?text=${encodeURIComponent(textoWhatsApp)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <MessageCircle className="w-4 h-4 mr-2" />
+                            WhatsApp
+                          </a>
+                        </Button>
+                        <Button asChild size="sm" variant="outline" className="flex-1">
+                          <a href={`tel:${telefono.replace(/\D/g, '')}`}>
+                            <Phone className="w-4 h-4 mr-2" />
+                            Llamar
+                          </a>
+                        </Button>
+                      </div>
+                    )}
+                  </Card>
+                )
+              })}
             </div>
             {apartadosDelDia.length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
