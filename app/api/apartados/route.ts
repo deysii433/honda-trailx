@@ -72,6 +72,44 @@ export async function PATCH(request: Request) {
   }
 }
 
+// DELETE: solo el admin puede eliminar una solicitud (el cliente se conserva)
+export async function DELETE(request: Request) {
+  try {
+    const admin = await getVerifiedAdminUser()
+    if (!admin) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    const body = await request.json().catch(() => null)
+    const id = String(body?.id ?? '')
+    if (!/^[0-9a-f-]{36}$/i.test(id)) {
+      return NextResponse.json({ error: 'Solicitud inválida' }, { status: 400 })
+    }
+
+    const supabase = getSupabaseServer()
+    const { data, error } = await supabase
+      .from('apartados')
+      .delete()
+      .eq('id', id)
+      .select('id')
+      .maybeSingle()
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    if (!data) {
+      return NextResponse.json({ error: 'Solicitud no encontrada' }, { status: 404 })
+    }
+
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Error al eliminar la solicitud' },
+      { status: 500 },
+    )
+  }
+}
+
 // ---- Límites contra spam ----
 const MAX_POR_TELEFONO = 3 // solicitudes por teléfono…
 const VENTANA_TELEFONO_MIN = 60 // …en esta cantidad de minutos
