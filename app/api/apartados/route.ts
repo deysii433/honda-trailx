@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server'
+import { getVerifiedAdminUser } from '@/lib/admin-auth'
 import { getSupabaseServer } from '@/lib/supabase/server'
 
 export async function GET() {
   try {
+    const admin = await getVerifiedAdminUser()
+    if (!admin) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const supabase = getSupabaseServer()
     const { data, error } = await supabase
       .from('apartados')
