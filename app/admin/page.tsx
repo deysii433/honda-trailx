@@ -112,6 +112,9 @@ export default function AdminPage() {
   const [solicitudesDate, setSolicitudesDate] = useState(() => fechaLocal(new Date()))
   const [estadoGuardando, setEstadoGuardando] = useState<string | null>(null)
   const [errorEstado, setErrorEstado] = useState('')
+  const [filtroEstado, setFiltroEstado] = useState('todas')
+  const [deleteApartadoId, setDeleteApartadoId] = useState<string | null>(null)
+  const [eliminandoApartado, setEliminandoApartado] = useState(false)
   const [listError, setListError] = useState('')
   const [formError, setFormError] = useState('')
 
@@ -184,6 +187,34 @@ export default function AdminPage() {
     const target = solicitudesDate
     return apartados.filter((row) => fechaLocal(new Date(row.fecha)) === target)
   }, [apartados, solicitudesDate])
+
+  // Lo que se ve en pantalla: las del día, filtradas por estado
+  const apartadosVisibles = useMemo(
+    () => (filtroEstado === 'todas' ? apartadosDelDia : apartadosDelDia.filter((row) => row.estado_pedido === filtroEstado)),
+    [apartadosDelDia, filtroEstado],
+  )
+
+  const handleDeleteApartado = async (id: string) => {
+    setErrorEstado('')
+    setEliminandoApartado(true)
+    try {
+      const response = await fetch('/api/apartados', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      if (!response.ok) {
+        const raw = await response.json().catch(() => null)
+        throw new Error(raw?.error ?? 'No se pudo eliminar la solicitud')
+      }
+      setApartados((rows) => rows.filter((row) => row.id !== id))
+    } catch (err) {
+      setErrorEstado(err instanceof Error ? err.message : 'No se pudo eliminar la solicitud')
+    } finally {
+      setEliminandoApartado(false)
+      setDeleteApartadoId(null)
+    }
+  }
 
   const cambiarEstado = async (id: string, estado: string) => {
     const anterior = apartados.find((row) => row.id === id)?.estado_pedido
@@ -723,6 +754,25 @@ export default function AdminPage() {
                 </Button>
               </div>
             </div>
+            {/* Filtro por estado */}
+            <div className="flex flex-wrap gap-2">
+              {[{ value: 'todas', label: 'Todas' }, ...ESTADOS_PEDIDO].map((opcion) => {
+                const total =
+                  opcion.value === 'todas'
+                    ? apartadosDelDia.length
+                    : apartadosDelDia.filter((row) => row.estado_pedido === opcion.value).length
+                return (
+                  <Button
+                    key={opcion.value}
+                    size="sm"
+                    variant={filtroEstado === opcion.value ? 'secondary' : 'ghost'}
+                    onClick={() => setFiltroEstado(opcion.value)}
+                  >
+                    {opcion.label} ({total})
+                  </Button>
+                )
+              })}
+            </div>
             {errorEstado && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
@@ -730,7 +780,7 @@ export default function AdminPage() {
               </Alert>
             )}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {apartadosDelDia.map((row) => {
+              {apartadosVisibles.map((row) => {
                 const estadoInfo = ESTADOS_PEDIDO.find((e) => e.value === row.estado_pedido) ?? ESTADOS_PEDIDO[0]
                 const nombreCliente = row.clientes?.nombre ?? 'Cliente'
                 const telefono = row.clientes?.telefono ?? ''
@@ -749,9 +799,21 @@ export default function AdminPage() {
                           {hora}
                         </p>
                       </div>
-                      <Badge variant="secondary" className="capitalize">
-                        {row.tipo_compra}
-                      </Badge>
+                      <div className="flex items-center gap-1">
+                        <Badge variant="secondary" className="capitalize">
+                          {row.tipo_compra}
+                        </Badge>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => setDeleteApartadoId(row.id)}
+                          aria-label="Eliminar solicitud"
+                          title="Eliminar solicitud"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
                       <div className="rounded-lg border border-border/70 bg-secondary/30 p-2">
@@ -824,9 +886,11 @@ export default function AdminPage() {
                 )
               })}
             </div>
-            {apartadosDelDia.length === 0 && (
+            {apartadosVisibles.length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
-                No hay solicitudes para este día.
+                {apartadosDelDia.length === 0
+                  ? 'No hay solicitudes para este día.'
+                  : 'No hay solicitudes con este estado para este día.'}
               </div>
             )}
           </div>
@@ -1418,6 +1482,31 @@ export default function AdminPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmación para eliminar una solicitud */}
+      <AlertDialog open={!!deleteApartadoId} onOpenChange={(open) => !open && setDeleteApartadoId(null)}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar solicitud?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. La solicitud se borrará del panel. Los datos del cliente se conservan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={eliminandoApartado}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={eliminandoApartado}
+              onClick={(e) => {
+                e.preventDefault()
+                if (deleteApartadoId) void handleDeleteApartado(deleteApartadoId)
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {eliminandoApartado ? 'Eliminando…' : 'Eliminar'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
