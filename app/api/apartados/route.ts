@@ -28,6 +28,50 @@ export async function GET() {
   }
 }
 
+// PATCH: solo el admin puede cambiar el estado de una solicitud
+const ESTADOS = ['pendiente', 'confirmado', 'cancelado', 'liquidado']
+
+export async function PATCH(request: Request) {
+  try {
+    const admin = await getVerifiedAdminUser()
+    if (!admin) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    const body = await request.json().catch(() => null)
+    const id = String(body?.id ?? '')
+    const estado = String(body?.estado ?? '')
+    if (!/^[0-9a-f-]{36}$/i.test(id)) {
+      return NextResponse.json({ error: 'Solicitud inválida' }, { status: 400 })
+    }
+    if (!ESTADOS.includes(estado)) {
+      return NextResponse.json({ error: 'Estado inválido' }, { status: 400 })
+    }
+
+    const supabase = getSupabaseServer()
+    const { data, error } = await supabase
+      .from('apartados')
+      .update({ estado_pedido: estado })
+      .eq('id', id)
+      .select('id, estado_pedido')
+      .maybeSingle()
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    if (!data) {
+      return NextResponse.json({ error: 'Solicitud no encontrada' }, { status: 404 })
+    }
+
+    return NextResponse.json(data)
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Error al actualizar el estado' },
+      { status: 500 },
+    )
+  }
+}
+
 // ---- Límites contra spam ----
 const MAX_POR_TELEFONO = 3 // solicitudes por teléfono…
 const VENTANA_TELEFONO_MIN = 60 // …en esta cantidad de minutos
